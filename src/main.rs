@@ -1,32 +1,39 @@
-use clap::{Arg, App, SubCommand};
+use clap::{App, Arg, SubCommand};
+use tokio;
 
-use std::error::Error;
 use bliss::*;
+use std::error::Error;
 
-fn main() -> Result<(), Box<dyn Error>> {
-     let matches = App::new("bliss")
-                          .version("1.0")
-                          .author("Avery Wagar <ajmw.subs@gmail.com>")
-                          .about("Ignorance is bliss! Ignore your .gitignore")
-                          .arg(Arg::with_name("LANGUAGE")
-                               .help("Set the languages to download .gitignores for (i.e. \"rust,python\")")
-                               .required(false)
-                               .index(1))
-                          .subcommand(SubCommand::with_name("list")
-                                      .about("List supported languages"))
-                          .subcommand(SubCommand::with_name("cache")
-                                      .about("Manage bliss cache")
-                                      .subcommand(SubCommand::with_name("clear").about("Clear bliss cache"))
-                                      .subcommand(SubCommand::with_name("update").about("Update bliss cache")))
-                          .get_matches();
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn Error>> {
+    let matches = App::new("bliss")
+        .version("1.0")
+        .author("Avery Wagar <ajmw.subs@gmail.com>")
+        .about("Ignorance is bliss! Ignore your .gitignore")
+        .arg(
+            Arg::with_name("LANGUAGE")
+                .help("Set the languages to download .gitignores for (i.e. \"rust,python\")")
+                .required(false)
+                .index(1),
+        )
+        .subcommand(SubCommand::with_name("list").about("List supported languages"))
+        .subcommand(
+            SubCommand::with_name("cache")
+                .about("Manage bliss cache")
+                .subcommand(SubCommand::with_name("clear").about("Clear bliss cache"))
+                .subcommand(SubCommand::with_name("update").about("Update bliss cache")),
+        )
+        .get_matches();
 
-
-    let mut bliss = Bliss::new();
+    let mut bliss = Bliss::new().await;
 
     if let Some(_) = matches.subcommand_matches("list") {
-        let langs = bliss.supported_langs()?;
+        let langs = bliss.supported_langs().await?;
 
-        println!("Supported Languages:\n========================\n{}", langs.join(", "));
+        println!(
+            "Supported Languages:\n========================\n{}",
+            langs.join(", ")
+        );
     }
     // Cache modification
     else if let Some(matches) = matches.subcommand_matches("cache") {
@@ -35,7 +42,10 @@ fn main() -> Result<(), Box<dyn Error>> {
             // TODO Clear cache
             println!("Clearing cache...");
 
-            std::fs::remove_dir_all(format!("{}/bliss", dirs::cache_dir().unwrap().to_string_lossy()))?;
+            std::fs::remove_dir_all(format!(
+                "{}/bliss",
+                dirs::cache_dir().unwrap().to_string_lossy()
+            ))?;
 
             // Exit early
             std::process::exit(0);
@@ -45,25 +55,31 @@ fn main() -> Result<(), Box<dyn Error>> {
             println!("Updating cache...");
 
             // Update supported languages
-            bliss.supported_langs()?;
+            bliss.supported_langs().await?;
 
             // Update .gitignore templates
             for lang in bliss.cache.gitignores.clone().keys() {
                 println!("Updating {} template...", lang);
                 bliss.cache.gitignores.remove(lang);
-                bliss.get_lang_gitignore(lang);
+                bliss.get_lang_gitignore(lang).await;
             }
         }
-    }
-    else {
-        for lang in matches.value_of("LANGUAGE").unwrap_or("").split(" ").collect::<Vec<_>>().join("").split(",") {
+    } else {
+        for lang in matches
+            .value_of("LANGUAGE")
+            .unwrap_or("")
+            .split(" ")
+            .collect::<Vec<_>>()
+            .join("")
+            .split(",")
+        {
             if lang == "" {
                 println!("Try: bliss help");
                 break;
             }
-            if bliss.is_supported(lang){
-                let ignore = bliss.get_lang_gitignore(lang); 
-                print!("{}", ignore.unwrap());
+            if bliss.is_supported(lang).await {
+                let ignore = bliss.get_lang_gitignore(lang);
+                print!("{}", ignore.await.unwrap());
             }
             // else {
             //     // TODO Don't print other languages if one fails
@@ -72,7 +88,6 @@ fn main() -> Result<(), Box<dyn Error>> {
             // }
         }
     }
-
 
     // let is_supported = bliss.is_supported("rust");
 
@@ -83,4 +98,3 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     Ok(())
 }
-

@@ -1,28 +1,27 @@
 use bliss::*;
 
-fn setup() -> Bliss {
-    Bliss::new()
+async fn setup() -> Bliss {
+    Bliss::new().await
 }
 
-#[test]
+#[tokio::test]
 /// Download supported_languages from the web
-fn web_supported_languages() {
-    let bliss = setup();
+async fn web_supported_languages() {
+    let bliss = setup().await;
 
-    let result = bliss.supported_langs();
-
+    let result = bliss.supported_langs().await;
 }
 
-#[test]
+#[tokio::test]
 /// Test pulling get_lang_gitignore with the rust language
-fn web_gitignore_rust() {
-    let mut bliss = setup();
+async fn web_gitignore_rust() {
+    let mut bliss = setup().await;
 
-    let result = bliss.get_lang_gitignore("rust");
+    let result = bliss.get_lang_gitignore("rust").await;
 
     let sucess = match result {
         None => false,
-        Some(_) => true
+        Some(_) => true,
     };
 
     assert!(sucess);
